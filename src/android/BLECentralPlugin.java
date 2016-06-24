@@ -38,6 +38,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONException;
 
+import java.nio.ByteBuffer;
 import java.util.*;
 
 public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.LeScanCallback {
@@ -71,6 +72,10 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     private static final String START_STATE_NOTIFICATIONS = "startStateNotifications";
     private static final String STOP_STATE_NOTIFICATIONS = "stopStateNotifications";
 
+    private static final String PAIR = "pair";
+    private static final String START_PAIRING_NOTIFICATIONS = "startPairingNotifications";
+    private static final String STOP_PAIRING_NOTIFICATIONS = "stopPairingNotifications";
+
     // callbacks
     CallbackContext discoverCallback;
     private CallbackContext enableBluetoothCallback;
@@ -103,6 +108,10 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
         put(BluetoothAdapter.STATE_ON, "on");
         put(BluetoothAdapter.STATE_TURNING_ON, "turningOn");
     }};
+
+    // Pairing receiver
+    CallbackContext pairCallback;
+    BroadcastReceiver pairReceiver;
 
     public void onDestroy() {
         removeStateListener();
@@ -260,7 +269,28 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
             resetScanOptions();
             this.reportDuplicates = options.optBoolean("reportDuplicates", false);
             findLowEnergyDevices(callbackContext, serviceUUIDs, -1);
+        } else if(action.equals(PAIR)) {
 
+            String macAddress = args.getString(0);
+            byte[] passkey = args.getArrayBuffer(1);
+            pair(callbackContext, macAddress, passkey);
+        } else if(action.equals(START_PAIRING_NOTIFICATIONS)) {
+            if (this.pairCallback != null) {
+                callbackContext.error("Pair callback already registered.");
+            } else {
+                this.pairCallback = callbackContext;
+                addPairingListener();
+            }
+        } else if(action.equals(STOP_PAIRING_NOTIFICATIONS)) {
+            if (this.pairCallback != null) {
+                // Clear callback in JavaScript without actually calling it
+                PluginResult result = new PluginResult(PluginResult.Status.NO_RESULT);
+                result.setKeepCallback(false);
+                this.pairCallback.sendPluginResult(result);
+                this.pairCallback = null;
+            }
+            removePairingListener();
+            callbackContext.success();
         } else {
 
             validAction = false;
@@ -495,6 +525,57 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
 
         PluginResult result = new PluginResult(PluginResult.Status.OK, json);
         callbackContext.sendPluginResult(result);
+    }
+
+    Peripheral currentPeripheral = null;
+    byte[] pk = null;
+
+    private void pair(CallbackContext callbackContext, String macAddress, byte[] passkey) {
+
+        pairCallback = callbackContext;
+
+        Peripheral peripheral = peripherals.get(macAddress);
+        currentPeripheral = peripheral;
+        pk = passkey;
+        boolean a = peripheral.pair(passkey);
+
+        PluginResult result = new PluginResult(PluginResult.Status.NO_RESULT);
+        callbackContext.sendPluginResult(result);
+    }
+    private void addPairingListener() {
+        if (this.pairReceiver == null) {
+            this.pairReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    String a = intent.getAction();
+                    if(pk != null) {
+                        currentPeripheral.getDevice().setPin(pk);
+                        pk = null;
+                    }
+                    LOG.i(TAG, a);
+                }
+            };
+        }
+
+        try {
+            IntentFilter intentFilter = new IntentFilter();
+            intentFilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+            intentFilter.addAction(BluetoothDevice.ACTION_PAIRING_REQUEST);
+            webView.getContext().registerReceiver(this.pairReceiver, intentFilter);
+        } catch (Exception e) {
+            LOG.e(TAG, "Error registering pairing receiver: " + e.getMessage(), e);
+        }
+    }
+    private void removePairingListener() {
+        if (this.pairReceiver != null) {
+            try {
+                webView.getContext().unregisterReceiver(this.pairReceiver);
+            } catch (Exception e) {
+                LOG.e(TAG, "Error unregistering pair receiver: " + e.getMessage(), e);
+            }
+        }
+        this.pairCallback = null;
+        this.pairReceiver = null;
     }
 
     @Override

@@ -173,6 +173,14 @@ public class Peripheral extends BluetoothGattCallback {
         return device;
     }
 
+    public boolean pair(byte[] passkey) {
+        BluetoothDevice device = getDevice();
+        boolean created = device.createBond();
+        device.setPairingConfirmation(true);
+        //device.setPin(passkey);
+        return created;
+    }
+
     @Override
     public void onServicesDiscovered(BluetoothGatt gatt, int status) {
         super.onServicesDiscovered(gatt, status);
