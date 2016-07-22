@@ -595,14 +595,18 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
                 discoverCallback.sendPluginResult(result);
             }
 
-        } else {
+        } else if (reportDuplicates) {
             Peripheral peripheral = peripherals.get(address);
-            peripheral.update(rssi, scanRecord);
-            if (reportDuplicates && discoverCallback != null) {
+            peripheral.updateRssi(rssi);
+            if (discoverCallback != null) {
                 PluginResult result = new PluginResult(PluginResult.Status.OK, peripheral.asJSONObject());
                 result.setKeepCallback(true);
                 discoverCallback.sendPluginResult(result);
             }
+        } else {
+            // this isn't necessary
+            Peripheral peripheral = peripherals.get(address);
+            peripheral.updateRssi(rssi);
         }
     }
 

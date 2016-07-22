@@ -293,12 +293,6 @@ public class Peripheral extends BluetoothGattCallback {
         commandCompleted();
     }
 
-    // Update rssi and scanRecord.
-    public void update(int rssi, byte[] scanRecord) {
-        this.advertisingRSSI = rssi;
-        this.advertisingData = scanRecord;
-    }
-
     public void updateRssi(int rssi) {
         advertisingRSSI = rssi;
     }
