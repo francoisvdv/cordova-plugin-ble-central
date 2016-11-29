@@ -111,9 +111,11 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
         put(BluetoothAdapter.STATE_TURNING_ON, "turningOn");
     }};
 
-    // Pairing receiver
+    // Pairing
     CallbackContext pairCallback;
     BroadcastReceiver pairReceiver;
+	int passkey = -1;
+	Peripheral currentPeripheral = null;
 
     public void onDestroy() {
         removeStateListener();
@@ -273,14 +275,13 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
             findLowEnergyDevices(callbackContext, serviceUUIDs, -1);
         } else if(action.equals(PAIR)) {
             String macAddress = args.getString(0);
-            byte[] passkey = args.getArrayBuffer(1);
+            int passkey = args.getInt(1);
             pair(callbackContext, macAddress, passkey);
         } else if(action.equals(START_PAIRING_NOTIFICATIONS)) {
             if (this.pairCallback != null) {
                 callbackContext.error("Pair callback already registered.");
             } else {
                 this.pairCallback = callbackContext;
-                addPairingListener();
             }
         } else if(action.equals(STOP_PAIRING_NOTIFICATIONS)) {
             if (this.pairCallback != null) {
@@ -290,7 +291,6 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
                 this.pairCallback.sendPluginResult(result);
                 this.pairCallback = null;
             }
-            removePairingListener();
             callbackContext.success();
         } else {
 
@@ -528,30 +528,20 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
         callbackContext.sendPluginResult(result);
     }
 
-    Peripheral currentPeripheral = null;
-    byte[] pk = null;
+    private void pair(CallbackContext callbackContext, String macAddress, int passkey) {
+		//Listen for pairing state changes
+		addPairingListener();
 
-    private void pair(CallbackContext callbackContext, String macAddress, byte[] passkey) {
         pairCallback = callbackContext;
 
         Peripheral peripheral = peripherals.get(macAddress);
         currentPeripheral = peripheral;
-        pk = passkey;
+        this.passkey = passkey;
         peripheral.pair(passkey);
 
         PluginResult result = new PluginResult(PluginResult.Status.NO_RESULT);
         callbackContext.sendPluginResult(result);
     }
-	public static byte[] hexStringToByteArray(String s) {
-		int len = s.length();
-		byte[] data = new byte[len/2];
-
-		for(int i = 0; i < len; i+=2){
-			data[i/2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i+1), 16));
-		}
-
-		return data;
-	}
     private void addPairingListener() {
         if (this.pairReceiver == null) {
             this.pairReceiver = new BroadcastReceiver() {
@@ -561,14 +551,16 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
 
 					if (action.equals(BluetoothDevice.ACTION_PAIRING_REQUEST)) {
 						try {
-							//if(pk != null) {
-								int pin = intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", 537270);
+							if(passkey != -1) {
+								//int pin = intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", passkey);
+								//byte[] pinBytes;// = hexStringToByteArray("0c634c2fda8147b4c4e53c771716dcd2");
+								//pinBytes = (""+pin).getBytes("UTF-8");
 
-								byte[] pinBytes;// = hexStringToByteArray("0c634c2fda8147b4c4e53c771716dcd2");
-								pinBytes = (""+pin).getBytes("UTF-8");
+								byte[] pinBytes = (""+passkey).getBytes("UTF-8");
 								currentPeripheral.getDevice().setPin(pinBytes);
-							//	pk = null;
-							//}
+								passkey = -1;
+								Log.i(TAG, "Pairing with passkey");
+							}
 							LOG.i(TAG, action);
 
 							//BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
@@ -582,6 +574,10 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
 							//setPairing confirmation if neeeded
 							//                   device.setPairingConfirmation(true);
 							//showMessage("ACTION_PAIRING_REQUEST received " + pin);
+
+							//call pairCallback()
+							if(pairCallback != null)
+								pairCallback.success("New Pairing Request");
 
 						} catch (Exception e) {
 							Log.e(TAG, "Error occurs when trying to auto pair");
@@ -621,7 +617,6 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
                 LOG.e(TAG, "Error unregistering pair receiver: " + e.getMessage(), e);
             }
         }
-        this.pairCallback = null;
         this.pairReceiver = null;
     }
 

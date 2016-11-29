@@ -26,6 +26,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.UnsupportedEncodingException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -173,12 +174,22 @@ public class Peripheral extends BluetoothGattCallback {
         return device;
     }
 
-    public boolean pair(byte[] passkey) {
-        BluetoothDevice device = getDevice();
-        boolean created = device.createBond();
-        //device.setPairingConfirmation(true);
-        //device.setPin(passkey);
-        return created;
+    public boolean pair(int passkey) {
+//        BluetoothDevice device = getDevice();
+//        boolean created = device.createBond();
+////        device.setPairingConfirmation(true);
+////
+////		byte[] pinBytes = new byte[0];
+////		try {
+////			pinBytes = (""+passkey).getBytes("UTF-8");
+////		} catch (UnsupportedEncodingException e) {
+////			e.printStackTrace();
+////		}
+////		device.setPin(pinBytes);
+//
+//        return created;
+
+		return true;
     }
 
     @Override
