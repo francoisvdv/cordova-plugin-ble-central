@@ -176,7 +176,7 @@ public class Peripheral extends BluetoothGattCallback {
     public boolean pair(byte[] passkey) {
         BluetoothDevice device = getDevice();
         boolean created = device.createBond();
-        device.setPairingConfirmation(true);
+        //device.setPairingConfirmation(true);
         //device.setPin(passkey);
         return created;
     }

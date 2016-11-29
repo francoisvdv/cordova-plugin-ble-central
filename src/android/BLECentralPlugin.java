@@ -28,6 +28,8 @@ import android.content.IntentFilter;
 import android.os.Handler;
 
 import android.provider.Settings;
+import android.util.Log;
+
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaArgs;
 import org.apache.cordova.CordovaPlugin;
@@ -270,7 +272,6 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
             this.reportDuplicates = options.optBoolean("reportDuplicates", false);
             findLowEnergyDevices(callbackContext, serviceUUIDs, -1);
         } else if(action.equals(PAIR)) {
-
             String macAddress = args.getString(0);
             byte[] passkey = args.getArrayBuffer(1);
             pair(callbackContext, macAddress, passkey);
@@ -531,28 +532,74 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     byte[] pk = null;
 
     private void pair(CallbackContext callbackContext, String macAddress, byte[] passkey) {
-
         pairCallback = callbackContext;
 
         Peripheral peripheral = peripherals.get(macAddress);
         currentPeripheral = peripheral;
         pk = passkey;
-        boolean a = peripheral.pair(passkey);
+        peripheral.pair(passkey);
 
         PluginResult result = new PluginResult(PluginResult.Status.NO_RESULT);
         callbackContext.sendPluginResult(result);
     }
+	public static byte[] hexStringToByteArray(String s) {
+		int len = s.length();
+		byte[] data = new byte[len/2];
+
+		for(int i = 0; i < len; i+=2){
+			data[i/2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i+1), 16));
+		}
+
+		return data;
+	}
     private void addPairingListener() {
         if (this.pairReceiver == null) {
             this.pairReceiver = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    String a = intent.getAction();
-                    if(pk != null) {
-                        currentPeripheral.getDevice().setPin(pk);
-                        pk = null;
-                    }
-                    LOG.i(TAG, a);
+                    String action = intent.getAction();
+
+					if (action.equals(BluetoothDevice.ACTION_PAIRING_REQUEST)) {
+						try {
+							//if(pk != null) {
+								int pin = intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", 537270);
+
+								byte[] pinBytes;// = hexStringToByteArray("0c634c2fda8147b4c4e53c771716dcd2");
+								pinBytes = (""+pin).getBytes("UTF-8");
+								currentPeripheral.getDevice().setPin(pinBytes);
+							//	pk = null;
+							//}
+							LOG.i(TAG, action);
+
+							//BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+							//int pin=intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", mPassKeyInt);
+							//the pin in case you need to accept for an specific pin
+							//                  Log.d(TAG, "Start Auto Pairing. PIN = " + intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY",mPassKeyInt));
+							//byte[] pinBytes;
+							//pinBytes = (""+pin).getBytes("UTF-8");
+							//                 pinBytes = (""+mPassKeyInt).getBytes("UTF-8");
+							//device.setPin(pk);
+							//setPairing confirmation if neeeded
+							//                   device.setPairingConfirmation(true);
+							//showMessage("ACTION_PAIRING_REQUEST received " + pin);
+
+						} catch (Exception e) {
+							Log.e(TAG, "Error occurs when trying to auto pair");
+							e.printStackTrace();
+						}
+					}
+
+					if (action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)) {
+						try {
+							//        mDevice.getBondState()
+							//showMessage("ACTION_BOND_STATE_CHANGED"+mDevice.getBondState());
+							LOG.i(TAG, "ACTION_BOND_STATE_CHANGED" + currentPeripheral.getDevice().getBondState());
+
+						} catch (Exception e) {
+							Log.e(TAG, "Error occurs when trying to auto pair");
+							e.printStackTrace();
+						}
+					}
                 }
             };
         }
