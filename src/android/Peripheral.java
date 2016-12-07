@@ -27,6 +27,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -189,8 +191,39 @@ public class Peripheral extends BluetoothGattCallback {
 //
 //        return created;
 
+		//Renaming the device
+//		try {
+//			Method method = device.getClass().getMethod("setAlias", String.class);
+//			if(method != null) {
+//				method.invoke(device, "new_device_name");
+//			}
+//		} catch (NoSuchMethodException e) {
+//			e.printStackTrace();
+//		} catch (InvocationTargetException e) {
+//			e.printStackTrace();
+//		} catch (IllegalAccessException e) {
+//			e.printStackTrace();
+//		}
+
 		return true;
     }
+	public boolean unpair() {
+		try {
+			Method method = device.getClass().getMethod("removeBond", (Class[]) null);
+			method.invoke(device, (Object[]) null);
+		} catch (NoSuchMethodException e) {
+			e.printStackTrace();
+			return false;
+		} catch (InvocationTargetException e) {
+			e.printStackTrace();
+			return false;
+		} catch (IllegalAccessException e) {
+			e.printStackTrace();
+			return false;
+		}
+
+		return true;
+	}
 
     @Override
     public void onServicesDiscovered(BluetoothGatt gatt, int status) {

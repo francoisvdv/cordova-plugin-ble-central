@@ -75,6 +75,7 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     private static final String STOP_STATE_NOTIFICATIONS = "stopStateNotifications";
 
     private static final String PAIR = "pair";
+	private static final String UNPAIR = "unpair";
     private static final String START_PAIRING_NOTIFICATIONS = "startPairingNotifications";
     private static final String STOP_PAIRING_NOTIFICATIONS = "stopPairingNotifications";
 
@@ -277,7 +278,10 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
             String macAddress = args.getString(0);
             int passkey = args.getInt(1);
             pair(callbackContext, macAddress, passkey);
-        } else if(action.equals(START_PAIRING_NOTIFICATIONS)) {
+        } else if(action.equals(UNPAIR)) {
+			String macAddress = args.getString(0);
+			unpair(callbackContext, macAddress);
+		} else if(action.equals(START_PAIRING_NOTIFICATIONS)) {
             if (this.pairCallback != null) {
                 callbackContext.error("Pair callback already registered.");
             } else {
@@ -535,79 +539,81 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
         pairCallback = callbackContext;
 
         Peripheral peripheral = peripherals.get(macAddress);
-        currentPeripheral = peripheral;
         this.passkey = passkey;
         peripheral.pair(passkey);
 
-        PluginResult result = new PluginResult(PluginResult.Status.NO_RESULT);
-        callbackContext.sendPluginResult(result);
+		callbackContext.success();
     }
+	private void unpair(CallbackContext callbackContext, String macAddress) {
+		Peripheral peripheral = peripherals.get(macAddress);
+		peripheral.unpair();
+		
+		callbackContext.success();
+	}
     private void addPairingListener() {
-        if (this.pairReceiver == null) {
-            this.pairReceiver = new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    String action = intent.getAction();
+		if(this.pairReceiver != null)
+			return;
 
-					if (action.equals(BluetoothDevice.ACTION_PAIRING_REQUEST)) {
-						try {
-							if(passkey != -1) {
-								//int pin = intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", passkey);
-								//byte[] pinBytes;// = hexStringToByteArray("0c634c2fda8147b4c4e53c771716dcd2");
-								//pinBytes = (""+pin).getBytes("UTF-8");
+		this.pairReceiver = new BroadcastReceiver() {
+			@Override
+			public void onReceive(Context context, Intent intent) {
+				String action = intent.getAction();
 
-								byte[] pinBytes = (""+passkey).getBytes("UTF-8");
-								currentPeripheral.getDevice().setPin(pinBytes);
-								passkey = -1;
-								Log.i(TAG, "Pairing with passkey");
-							}
-							LOG.i(TAG, action);
-
-							//BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-							//int pin=intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", mPassKeyInt);
-							//the pin in case you need to accept for an specific pin
-							//                  Log.d(TAG, "Start Auto Pairing. PIN = " + intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY",mPassKeyInt));
-							//byte[] pinBytes;
+				if (action.equals(BluetoothDevice.ACTION_PAIRING_REQUEST)) {
+					try {
+						if(passkey != -1) {
+							//int pin = intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", passkey);
+							//byte[] pinBytes;// = hexStringToByteArray("0c634c2fda8147b4c4e53c771716dcd2");
 							//pinBytes = (""+pin).getBytes("UTF-8");
-							//                 pinBytes = (""+mPassKeyInt).getBytes("UTF-8");
-							//device.setPin(pk);
-							//setPairing confirmation if neeeded
-							//                   device.setPairingConfirmation(true);
-							//showMessage("ACTION_PAIRING_REQUEST received " + pin);
 
-							//call pairCallback()
-							if(pairCallback != null)
-								pairCallback.success("New Pairing Request");
-
-						} catch (Exception e) {
-							Log.e(TAG, "Error occurs when trying to auto pair");
-							e.printStackTrace();
+							byte[] pinBytes = (""+passkey).getBytes("UTF-8");
+							BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+							device.setPin(pinBytes);
+							passkey = -1;
+							Log.i(TAG, "Pairing with passkey");
 						}
+						LOG.i(TAG, action);
+
+						//BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+						//int pin=intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", mPassKeyInt);
+						//the pin in case you need to accept for an specific pin
+						//                  Log.d(TAG, "Start Auto Pairing. PIN = " + intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY",mPassKeyInt));
+						//byte[] pinBytes;
+						//pinBytes = (""+pin).getBytes("UTF-8");
+						//                 pinBytes = (""+mPassKeyInt).getBytes("UTF-8");
+						//device.setPin(pk);
+						//setPairing confirmation if neeeded
+						//                   device.setPairingConfirmation(true);
+						//showMessage("ACTION_PAIRING_REQUEST received " + pin);
+
+						if(pairCallback != null)
+							pairCallback.success("New Pairing Request");
+					} catch (Exception e) {
+						Log.e(TAG, "Error occurs when trying to auto pair");
+						e.printStackTrace();
 					}
+				}
 
-					if (action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)) {
-						try {
-							//        mDevice.getBondState()
-							//showMessage("ACTION_BOND_STATE_CHANGED"+mDevice.getBondState());
-							LOG.i(TAG, "ACTION_BOND_STATE_CHANGED" + currentPeripheral.getDevice().getBondState());
-
-						} catch (Exception e) {
-							Log.e(TAG, "Error occurs when trying to auto pair");
-							e.printStackTrace();
-						}
+				if (action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)) {
+					try {
+						BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+						LOG.i(TAG, "ACTION_BOND_STATE_CHANGED" + device.getBondState());
+					} catch (Exception e) {
+						Log.e(TAG, "Error occurs when trying to auto pair");
+						e.printStackTrace();
 					}
-                }
-            };
-        }
+				}
+			}
+		};
 
-        try {
-            IntentFilter intentFilter = new IntentFilter();
-            intentFilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
-            intentFilter.addAction(BluetoothDevice.ACTION_PAIRING_REQUEST);
-            webView.getContext().registerReceiver(this.pairReceiver, intentFilter);
-        } catch (Exception e) {
-            LOG.e(TAG, "Error registering pairing receiver: " + e.getMessage(), e);
-        }
+		try {
+			IntentFilter intentFilter = new IntentFilter();
+			intentFilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+			intentFilter.addAction(BluetoothDevice.ACTION_PAIRING_REQUEST);
+			webView.getContext().registerReceiver(this.pairReceiver, intentFilter);
+		} catch (Exception e) {
+			LOG.e(TAG, "Error registering pairing receiver: " + e.getMessage(), e);
+		}
     }
     private void removePairingListener() {
         if (this.pairReceiver != null) {
